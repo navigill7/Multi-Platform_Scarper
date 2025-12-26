@@ -1,5 +1,5 @@
 /**
- * LinkedIn Profile Scraper
+ * LinkedIn Profile Scraper (FIXED VERSION)
  * Parses LinkedIn profile HTML to extract structured data
  */
 
@@ -29,24 +29,32 @@ class LinkedInScraper {
     };
 
     try {
+      console.log('🔍 Starting LinkedIn scrape...');
+      
       // Extract name
       profile.name = this.extractName($);
+      console.log('   Name:', profile.name);
       
       // Extract headline/bio line
       profile.headline = this.extractHeadline($);
       profile.bio_line = profile.headline;
+      console.log('   Headline:', profile.headline);
       
       // Extract location
       profile.location = this.extractLocation($);
+      console.log('   Location:', profile.location);
       
-      // Extract about section
-      profile.about = this.extractAbout($);
+      // Extract about section (ENHANCED)
+      profile.about = this.extractAbout($, html);
+      console.log('   About:', profile.about ? profile.about.substring(0, 50) + '...' : 'N/A');
       
-      // Extract follower count
-      profile.follower_count = this.extractFollowerCount($);
+      // Extract follower count (ENHANCED)
+      profile.follower_count = this.extractFollowerCount($, html);
+      console.log('   Followers:', profile.follower_count);
       
-      // Extract connection count
-      profile.connection_count = this.extractConnectionCount($);
+      // Extract connection count (FIXED)
+      profile.connection_count = this.extractConnectionCount($, html);
+      console.log('   Connections:', profile.connection_count);
 
       console.log('✅ LinkedIn profile scraped successfully:', profile.name);
       return profile;
@@ -65,7 +73,8 @@ class LinkedInScraper {
       '.pv-text-details__left-panel h1',
       'h1.inline.t-24.v-align-middle.break-words',
       '.pv-top-card--list li:first-child',
-      'div.ph5 h1'
+      'div.ph5 h1',
+      'h1[class*="heading"]'
     ];
 
     for (const selector of selectors) {
@@ -83,12 +92,15 @@ class LinkedInScraper {
       '.text-body-medium.break-words',
       '.pv-text-details__left-panel .text-body-medium',
       'div.text-body-medium.break-words',
-      '.pv-top-card--list.pv-top-card--list-bullet.mt1 li:first-child'
+      '.pv-top-card--list.pv-top-card--list-bullet.mt1 li:first-child',
+      'div[class*="headline"]'
     ];
 
     for (const selector of selectors) {
       const text = $(selector).first().text().trim();
-      if (text) return text;
+      if (text && !text.includes('followers') && !text.includes('connections')) {
+        return text;
+      }
     }
     return '';
   }
@@ -101,12 +113,16 @@ class LinkedInScraper {
       '.text-body-small.inline.t-black--light.break-words',
       '.pv-text-details__left-panel .text-body-small',
       'span.text-body-small.inline.t-black--light.break-words',
-      '.pv-top-card--list-bullet li'
+      '.pv-top-card--list-bullet li',
+      'div[class*="location"]'
     ];
 
     for (const selector of selectors) {
       const text = $(selector).first().text().trim();
-      if (text && !text.toLowerCase().includes('contact info')) {
+      if (text && 
+          !text.toLowerCase().includes('contact info') && 
+          !text.toLowerCase().includes('followers') &&
+          !text.toLowerCase().includes('connections')) {
         return text;
       }
     }
@@ -114,97 +130,195 @@ class LinkedInScraper {
   }
 
   /**
-   * Extract about section
+   * Extract about section (ENHANCED with multiple strategies)
    */
-  static extractAbout($) {
-    const selectors = [
-      '#about ~ * .display-flex.ph5.pv3',
-      'section[data-section="summary"] .pv-shared-text-with-see-more',
-      '.pv-about-section .pv-about__summary-text',
-      'div[id="about"] ~ div .inline-show-more-text'
-    ];
+  static extractAbout($, html) {
+    // Strategy 1: Look for About section by ID and nearby content
+    const aboutHeadings = $('h2, h3, div[id*="about"]').filter((i, el) => {
+      const text = $(el).text().trim().toLowerCase();
+      return text === 'about' || text.includes('about');
+    });
 
-    for (const selector of selectors) {
-      const text = $(selector).first().text().trim();
-      if (text) return text;
+    if (aboutHeadings.length > 0) {
+      // Try to find content in various locations relative to heading
+      const heading = aboutHeadings.first();
+      
+      // Method 1: Next sibling div
+      let aboutText = heading.next('div').text().trim();
+      if (aboutText && aboutText.length > 20) {
+        return aboutText;
+      }
+      
+      // Method 2: Parent's next sibling
+      aboutText = heading.parent().next().text().trim();
+      if (aboutText && aboutText.length > 20) {
+        return aboutText;
+      }
+      
+      // Method 3: Find display-flex container nearby
+      aboutText = heading.parent().parent().find('.display-flex').first().text().trim();
+      if (aboutText && aboutText.length > 20) {
+        return aboutText;
+      }
+      
+      // Method 4: Find any div with substantial text after About heading
+      const nextDivs = heading.parent().parent().find('div');
+      for (let i = 0; i < nextDivs.length; i++) {
+        const text = $(nextDivs[i]).text().trim();
+        if (text && text.length > 30 && text !== 'About' && !text.includes('Show all')) {
+          return text;
+        }
+      }
     }
 
-    // Alternative: find "About" heading and get next content
-    const aboutHeading = $('h2, h3').filter((i, el) => {
-      return $(el).text().trim().toLowerCase() === 'about';
-    }).first();
+    // Strategy 2: Look for common About section CSS classes
+    const aboutSelectors = [
+      '.pv-about-section .pv-about__summary-text',
+      'section[data-section="summary"] .pv-shared-text-with-see-more',
+      '.pv-about__summary-text',
+      'div[class*="about"] span[class*="text"]',
+      'section div.display-flex.ph5.pv3',
+      '.inline-show-more-text'
+    ];
 
-    if (aboutHeading.length) {
-      const aboutContent = aboutHeading.parent().parent().find('.display-flex').first();
-      return aboutContent.text().trim() || '';
+    for (const selector of aboutSelectors) {
+      const text = $(selector).first().text().trim();
+      if (text && text.length > 20) {
+        return text;
+      }
+    }
+
+    // Strategy 3: Text pattern matching in HTML
+    // Look for "About" followed by substantial text
+    const aboutMatch = html.match(/About[\s\S]{0,200}?<div[^>]*>([\s\S]{30,500}?)<\/div>/i);
+    if (aboutMatch) {
+      const $ = cheerio.load(aboutMatch[1]);
+      const text = $.text().trim();
+      if (text && text.length > 20) {
+        return text;
+      }
+    }
+
+    // Strategy 4: Find any substantial text block that looks like an about section
+    const textBlocks = $('div span, div p').filter((i, el) => {
+      const text = $(el).text().trim();
+      return text.length > 50 && text.length < 1000;
+    });
+
+    for (let i = 0; i < textBlocks.length; i++) {
+      const text = $(textBlocks[i]).text().trim();
+      // Make sure it's not navigation or metadata
+      if (!text.includes('followers') && 
+          !text.includes('connections') && 
+          !text.match(/^\d+/) &&
+          !text.includes('Contact info') &&
+          text.split(' ').length > 5) {
+        return text;
+      }
     }
 
     return '';
   }
 
   /**
-   * Extract follower count
+   * Extract follower count (ENHANCED)
    */
-  static extractFollowerCount($) {
-    const bodyText = $('body').text();
-    
-    // Method 1: Look for follower patterns in links
-    const followerLinks = $('a[href*="facetNetwork"], a.pv-top-card--list-bullet');
-    for (let i = 0; i < followerLinks.length; i++) {
-      const linkText = $(followerLinks[i]).text().toLowerCase();
-      if (linkText.includes('follower')) {
-        const match = linkText.match(/(\d+(?:[,\.]\d+)?[KkMm]?)\s*followers?/i);
+  static extractFollowerCount($, html) {
+    // Strategy 1: Look for follower text in links
+    const links = $('a, span, div');
+    for (let i = 0; i < links.length; i++) {
+      const text = $(links[i]).text().toLowerCase();
+      if (text.includes('follower')) {
+        const match = text.match(/(\d+(?:[,\.]\d+)?[KkMm]?)\s*followers?/i);
         if (match) {
-          return this.parseCount(match[1]);
+          const count = this.parseCount(match[1]);
+          if (count > 0) {
+            console.log('   Found followers via element:', text);
+            return count;
+          }
         }
       }
     }
 
-    // Method 2: Search in full body text
-    const followerMatch = bodyText.match(/(\d+(?:[,\.]\d+)?[KkMm]?)\s*followers?/i);
-    if (followerMatch) {
-      return this.parseCount(followerMatch[1]);
+    // Strategy 2: Search in full HTML text
+    const followerPatterns = [
+      /(\d+(?:[,\.]\d+)?[KkMm]?)\s*followers?/gi,
+      /followers?[:\s]*(\d+(?:[,\.]\d+)?[KkMm]?)/gi
+    ];
+
+    for (const pattern of followerPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        const count = this.parseCount(match[1]);
+        if (count > 0) {
+          console.log('   Found followers via pattern:', match[0]);
+          return count;
+        }
+      }
     }
 
     return 0;
   }
 
   /**
-   * Extract connection count
+   * Extract connection count (FIXED to handle 500+)
    */
-  static extractConnectionCount($) {
-    const bodyText = $('body').text();
-    
-    // Method 1: Look for connection patterns in links
-    const connectionLinks = $('a[href*="facetConnectionOf"], a.pv-top-card--list-bullet');
-    for (let i = 0; i < connectionLinks.length; i++) {
-      const linkText = $(connectionLinks[i]).text().toLowerCase();
-      if (linkText.includes('connection')) {
-        const match = linkText.match(/(\d+(?:[,\.]\d+)?[KkMm]?\+?)\s*connections?/i);
+  static extractConnectionCount($, html) {
+    // Strategy 1: Look for connection text in elements
+    const elements = $('a, span, div, li');
+    for (let i = 0; i < elements.length; i++) {
+      const text = $(elements[i]).text().toLowerCase();
+      if (text.includes('connection')) {
+        const match = text.match(/(\d+(?:[,\.]\d+)?[KkMm]?\+?)\s*connections?/i);
         if (match) {
-          return this.parseCount(match[1]);
+          const count = this.parseCount(match[1]);
+          if (count > 0) {
+            console.log('   Found connections via element:', text);
+            return count;
+          }
         }
       }
     }
 
-    // Method 2: Search in full body text
-    const connectionMatch = bodyText.match(/(\d+(?:[,\.]\d+)?[KkMm]?\+?)\s*connections?/i);
-    if (connectionMatch) {
-      return this.parseCount(connectionMatch[1]);
+    // Strategy 2: Search in full HTML with multiple patterns
+    const connectionPatterns = [
+      /(\d+(?:[,\.]\d+)?[KkMm]?\+?)\s*connections?/gi,
+      /connections?[:\s]*(\d+(?:[,\.]\d+)?[KkMm]?\+?)/gi,
+      // Specific pattern for "500+ connections"
+      /(500\+)\s*connections?/gi
+    ];
+
+    for (const pattern of connectionPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        const count = this.parseCount(match[1]);
+        if (count > 0) {
+          console.log('   Found connections via pattern:', match[0]);
+          return count;
+        }
+      }
     }
 
     return 0;
   }
 
   /**
-   * Parse count string to number
-   * @param {string} text - Count text (e.g., "10K", "1.5M", "500")
+   * Parse count string to number (FIXED to handle + symbol)
+   * @param {string} text - Count text (e.g., "10K", "1.5M", "500+")
    * @returns {number}
    */
   static parseCount(text) {
     if (!text) return 0;
     
-    const cleanText = text.toString().toLowerCase().replace(/[^0-9.km+]/g, '');
+    const cleanText = text.toString().toLowerCase()
+      .replace(/[,\s]/g, '') // Remove commas and spaces
+      .replace(/\+$/, '');   // Remove trailing +
+    
+    // Handle special case: "500+" means 500
+    if (text.includes('+')) {
+      const num = parseInt(cleanText);
+      return isNaN(num) ? 0 : num;
+    }
     
     if (cleanText.includes('k')) {
       return Math.round(parseFloat(cleanText) * 1000);
@@ -212,7 +326,7 @@ class LinkedInScraper {
       return Math.round(parseFloat(cleanText) * 1000000);
     }
     
-    return parseInt(cleanText.replace(/[,+]/g, '')) || 0;
+    return parseInt(cleanText) || 0;
   }
 }
 
