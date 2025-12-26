@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile Scraper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Multi-Platform Profile Scraper</h1>
+    
+    <!-- Current Page Info -->
+    <section class="feature-section">
+      <h2>Current Page</h2>
+      <div id="pageInfo" class="page-info">
+        <div class="info-row">
+          <span class="label">Platform:</span>
+          <span id="platformName" class="value">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">URL:</span>
+          <span id="currentUrl" class="value">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status:</span>
+          <span id="pageStatus" class="value status-unknown">Checking...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HTML Capture Section -->
+    <section class="feature-section">
+      <h2>📄 Page HTML Capture</h2>
+      <p class="description">
+        Send current page HTML to backend for intelligent scraping
+      </p>
+      <button id="captureBtn" class="btn btn-primary" disabled>
+        Send Page to Backend
+      </button>
+      <div id="captureResult" class="result"></div>
+      <div id="captureProgress" class="progress-container"></div>
+    </section>
+
+    <!-- Profile Data Preview -->
+    <section id="profilePreview" class="feature-section" style="display: none;">
+      <h2>✅ Extracted Profile Data</h2>
+      <div id="profileData" class="profile-data"></div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="feature-section stats-section">
+      <h2>📊 Statistics</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="linkedinCount">-</div>
+          <div class="stat-label">LinkedIn Profiles</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="instagramCount">-</div>
+          <div class="stat-label">Instagram Profiles</div>
+        </div>
+      </div>
+      <button id="refreshStats" class="btn btn-secondary">Refresh Stats</button>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
